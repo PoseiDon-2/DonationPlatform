@@ -71,68 +71,67 @@ app.use(async (req, res, next) => {
 // /register
 app.post('/register', async (req, res) => {
     const defaultProfilePicture = './image/large.jpg';
+    const { name, email, password } = req.body;
+    
+    if (!name || !email || !password) {
+        return res.status(400).json({ status: 'error', message: 'All fields are required' });
+    }
+    
     try {
-        console.log('Register request received:', req.body);
+        console.log('Register request received:', { email });
 
-        const existingUsersResult = await req.db.query(
+        // ตรวจสอบว่าผู้ใช้มีอยู่แล้วหรือไม่
+        const existingUser = await req.db.query(
             'SELECT email FROM users WHERE email = $1',
-            [req.body.email]
+            [email]
         );
-        const existingUsers = existingUsersResult.rows;
-        console.log('Existing users:', existingUsers);
-        if (existingUsers.length > 0) {
-            return res.json({ status: 'error', message: 'Email is already registered' });
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ status: 'error', message: 'Email is already registered' });
         }
 
-        const pendingUsersResult = await req.db.query(
+        // ตรวจสอบว่าผู้ใช้อยู่ใน pending_users หรือไม่
+        const pendingUser = await req.db.query(
             'SELECT email FROM pending_users WHERE email = $1',
-            [req.body.email]
+            [email]
         );
-        const pendingUsers = pendingUsersResult.rows;
-        console.log('Pending users:', pendingUsers);
 
-        const hash = await bcrypt.hash(req.body.password, saltRounds);
-        console.log('Password hashed successfully');
-        const verificationToken = jwt.sign({ email: req.body.email }, secret, { expiresIn: '24h' });
-        console.log('Verification token generated:', verificationToken);
+        const hash = await bcrypt.hash(password, saltRounds);
+        const verificationToken = jwt.sign({ email }, secret, { expiresIn: '24h' });
 
-        if (pendingUsers.length > 0) {
+        if (pendingUser.rows.length > 0) {
             await req.db.query(
                 'UPDATE pending_users SET name = $1, password_hash = $2, verification_token = $3 WHERE email = $4',
-                [req.body.name, hash, verificationToken, req.body.email]
+                [name, hash, verificationToken, email]
             );
-            console.log('Updated pending_users');
         } else {
             await req.db.query(
                 'INSERT INTO pending_users (name, email, password_hash, verification_token) VALUES ($1, $2, $3, $4)',
-                [req.body.name, req.body.email, hash, verificationToken]
+                [name, email, hash, verificationToken]
             );
-            console.log('Inserted into pending_users');
         }
 
+        // ส่งอีเมลยืนยัน
         const verificationLink = `https://donation-platform-sable.vercel.app/verify?token=${verificationToken}&redirect=/thank-you`;
         const mailOptions = {
             from: process.env.EMAIL_USER,
-            to: req.body.email,
+            to: email,
             subject: 'Verify Your Email',
             html: `<p>คลิกที่นี่เพื่อยืนยันอีเมลของคุณ: <a href="${verificationLink}">ยืนยัน</a></p>`
         };
 
-        console.log('Sending email with:', {
-            from: process.env.EMAIL_USER,
-            to: req.body.email,
-            userSet: !!process.env.EMAIL_USER,
-            passSet: !!process.env.EMAIL_PASS
-        });
-        await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully');
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.error('Email credentials are missing');
+            return res.status(500).json({ status: 'error', message: 'Email service not configured properly' });
+        }
 
+        await transporter.sendMail(mailOptions);
         res.json({ status: 'OK', message: 'Please check your email to verify and complete registration.' });
     } catch (err) {
         console.error('Register error:', err);
-        res.status(500).json({ status: 'error', message: `Registration failed: ${err.message}` });
+        res.status(500).json({ status: 'error', message: 'Registration failed, please try again later' });
     }
 });
+
 
 // /verify
 app.get('/verify', async (req, res) => {
