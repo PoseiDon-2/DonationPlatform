@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -7,36 +7,47 @@ function PendingVerification() {
     const { state } = useLocation();
     const navigate = useNavigate();
     const email = state?.email;
+    const [statusMessage, setStatusMessage] = useState('กำลังตรวจสอบอีเมล...');
 
     useEffect(() => {
         if (!email) {
+            setStatusMessage('ไม่พบอีเมล กรุณาสมัครใหม่');
             navigate('/register');
             return;
         }
 
         const interval = setInterval(async () => {
             try {
-                const response = await axios.get(`http://localhost:3000/check-verification?email=${email}`);
+                console.log('Polling for email:', email); // Debug
+                const response = await axios.get(`https://donation-platform-sable.vercel.app/api/check-verification?email=${email}`);
+                console.log('Response:', response.data); // Debug
+
                 if (response.data.status === 'verified') {
+                    setStatusMessage('ยืนยันสำเร็จ! กำลังพาคุณไปหน้าเข้าสู่ระบบ...');
                     clearInterval(interval);
-                    navigate('/login');
+                    setTimeout(() => navigate('/login'), 1000);
                 } else if (response.data.status === 'not_found') {
+                    setStatusMessage('ไม่พบข้อมูลการสมัคร กรุณาสมัครใหม่');
                     clearInterval(interval);
                     navigate('/register');
+                } else {
+                    setStatusMessage('กรุณายืนยันอีเมลของคุณ');
                 }
             } catch (err) {
                 console.error('Polling error:', err);
+                setStatusMessage('เกิดข้อผิดพลาดในการตรวจสอบ โปรดลองใหม่');
             }
-        }, 2000); // เช็คทุก 2 วินาที
+        }, 2000);
 
-        return () => clearInterval(interval); // ล้าง interval เมื่อออกจากหน้า
+        return () => clearInterval(interval);
     }, [email, navigate]);
 
     return (
         <div className="text-center">
             <h2 className="text-warning">รอการยืนยันอีเมล</h2>
-            <p>กรุณาตรวจสอบอีเมลของคุณ ({email}) และคลิกลิงก์ยืนยัน</p>
-            <p>เมื่อยืนยันสำเร็จ หน้าจะเปลี่ยนไปหน้าเข้าสู่ระบบอัตโนมัติ</p>
+            <p>อีเมล: {email}</p>
+            <p>{statusMessage}</p>
+            <p>กรุณาตรวจสอบอีเมลของคุณและคลิกลิงก์ยืนยัน</p>
             <p>หากไม่ได้รับอีเมล กรุณาตรวจสอบในโฟลเดอร์สแปม หรือ <Link to="/register">สมัครใหม่</Link></p>
         </div>
     );
