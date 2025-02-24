@@ -23,17 +23,22 @@ const transporter = nodemailer.createTransport({
 });
 
 async function initializeDatabase() {
-    console.log('Initializing database with:', process.env.DATABASE_URL.replace(/:([^@]+)@/, ':****@')); // Log URL โดยซ่อน password
+    const dbUrl = process.env.DATABASE_URL;
+    console.log('DATABASE_URL:', dbUrl ? dbUrl.replace(/:([^@]+)@/, ':****@') : 'Not set');
+    if (!dbUrl) {
+        throw new Error('DATABASE_URL environment variable is not set');
+    }
     const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: dbUrl,
         ssl: { rejectUnauthorized: false }
     });
-    // Test connection
-    await pool.query('SELECT NOW()').catch(err => {
-        console.error('Database connection failed:', err);
+    try {
+        const result = await pool.query('SELECT NOW()');
+        console.log('Database connection test successful:', result.rows[0]);
+    } catch (err) {
+        console.error('Database connection test failed:', err);
         throw err;
-    });
-    console.log('Database connected successfully');
+    }
     return pool;
 }
 
@@ -44,7 +49,8 @@ app.use(async (req, res, next) => {
         try {
             dbPromise = initializeDatabase();
         } catch (err) {
-            return next(err);
+            console.error('Failed to initialize database:', err);
+            return res.status(500).json({ status: 'error', message: 'Failed to initialize database' });
         }
     }
     try {
@@ -52,33 +58,36 @@ app.use(async (req, res, next) => {
         next();
     } catch (err) {
         console.error('Database error in middleware:', err);
-        res.status(500).json({ status: 'error', message: 'Database connection failed' });
+        res.status(500).json({ status: 'error', message: 'Database connection failed: ' + err.message });
     }
 });
 
 app.post('/register', async (req, res) => {
     const defaultProfilePicture = './image/large.jpg';
     try {
-        console.log('Register request:', req.body);
+        console.log('Register request received:', req.body);
 
-        const [existingUsers] = (await req.db.query(
+        const existingUsersResult = await req.db.query(
             'SELECT email FROM users WHERE email = $1',
             [req.body.email]
-        )).rows;
+        );
+        const existingUsers = existingUsersResult.rows;
         console.log('Existing users:', existingUsers);
         if (existingUsers.length > 0) {
             return res.json({ status: 'error', message: 'Email is already registered' });
         }
 
-        const [pendingUsers] = (await req.db.query(
+        const pendingUsersResult = await req.db.query(
             'SELECT email FROM pending_users WHERE email = $1',
             [req.body.email]
-        )).rows;
+        );
+        const pendingUsers = pendingUsersResult.rows;
         console.log('Pending users:', pendingUsers);
 
         const hash = await bcrypt.hash(req.body.password, saltRounds);
+        console.log('Password hashed');
         const verificationToken = jwt.sign({ email: req.body.email }, secret, { expiresIn: '24h' });
-        console.log('Generated token:', verificationToken);
+        console.log('Token generated:', verificationToken);
 
         if (pendingUsers.length > 0) {
             await req.db.query(
@@ -112,20 +121,23 @@ app.post('/register', async (req, res) => {
         res.json({ status: 'OK', message: 'Please check your email to verify and complete registration.' });
     } catch (err) {
         console.error('Register error:', err);
-        res.status(500).json({ status: 'error', message: err.message });
+        res.status(500).json({ status: 'error', message: `Registration failed: ${err.message}` });
     }
 });
 
 // /verify
 app.get('/verify', async (req, res) => {
     try {
+        console.log('Verify request received:', req.query);
         const token = req.query.token;
         const decoded = jwt.verify(token, secret);
 
-        const [pending] = (await req.db.query(
+        const pendingResult = await req.db.query(
             'SELECT * FROM pending_users WHERE email = $1 AND verification_token = $2',
             [decoded.email, token]
-        )).rows;
+        );
+        const pending = pendingResult.rows;
+        console.log('Pending users found:', pending);
 
         if (pending.length === 0) {
             return res.json({ status: 'error', message: 'Invalid or expired verification token' });
@@ -135,6 +147,7 @@ app.get('/verify', async (req, res) => {
         const now = new Date();
         if ((now - createdAt) / (1000 * 60 * 60) > 24) {
             await req.db.query('DELETE FROM pending_users WHERE email = $1', [decoded.email]);
+            console.log('Expired token deleted from pending_users');
             return res.json({ status: 'error', message: 'Verification link has expired' });
         }
 
@@ -142,15 +155,18 @@ app.get('/verify', async (req, res) => {
             'INSERT INTO users (name, email, password_hash, profile_picture) VALUES ($1, $2, $3, $4)',
             [pending[0].name, pending[0].email, pending[0].password_hash, defaultProfilePicture]
         );
+        console.log('Inserted into users');
 
         await req.db.query('DELETE FROM pending_users WHERE email = $1', [decoded.email]);
+        console.log('Deleted from pending_users');
 
         res.json({ status: 'OK', message: 'Email verified and registration completed!' });
     } catch (err) {
+        console.error('Verify error:', err);
         if (err.name === 'TokenExpiredError') {
             return res.json({ status: 'error', message: 'Verification link has expired' });
         }
-        res.json({ status: 'error', message: 'Invalid verification token' });
+        res.json({ status: 'error', message: `Verification failed: ${err.message}` });
     }
 });
 
