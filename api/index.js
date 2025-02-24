@@ -28,6 +28,10 @@ async function initializeDatabase() {
     if (!dbUrl) {
         throw new Error('DATABASE_URL environment variable is not set');
     }
+    if (!dbUrl.includes('neon.tech')) {
+        console.error('DATABASE_URL does not point to Neon:', dbUrl);
+        throw new Error('Invalid DATABASE_URL: Must point to Neon');
+    }
     const pool = new Pool({
         connectionString: dbUrl,
         ssl: { rejectUnauthorized: false }
@@ -41,7 +45,6 @@ async function initializeDatabase() {
     }
     return pool;
 }
-
 let dbPromise;
 
 app.use(async (req, res, next) => {
