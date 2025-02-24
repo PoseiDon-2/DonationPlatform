@@ -77,16 +77,18 @@ app.post('/register', async (req, res) => {
             html: `<p>คลิกที่นี่เพื่อยืนยันอีเมลของคุณ: <a href="${verificationLink}">ยืนยัน</a></p>`
         };
 
-        console.log('Sending email to:', req.body.email); // Log เพื่อ debug
-        await transporter.sendMail(mailOptions).catch(err => {
-            console.error('Email sending failed:', err);
-            throw new Error('Failed to send verification email');
+        console.log('Attempting to send email with:', {
+            from: process.env.EMAIL_USER,
+            to: req.body.email
         });
 
+        await transporter.sendMail(mailOptions); // ไม่มี catch ที่นี่ จะไป catch รวม
+
+        console.log('Email sent successfully to:', req.body.email);
         res.json({ status: 'OK', message: 'Please check your email to verify and complete registration.' });
     } catch (err) {
         console.error('Register error:', err);
-        res.json({ status: 'error', message: err.message });
+        res.status(500).json({ status: 'error', message: `Failed to register: ${err.message}` });
     }
 });
 
