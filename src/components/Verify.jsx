@@ -12,7 +12,7 @@ function Verify() {
         const redirect = searchParams.get('redirect') || '/thank-you';
 
         if (token) {
-            axios.get(`http://localhost:3000/verify?token=${token}`) // เรียก backend
+            axios.get(`https://donation-platform-sable.vercel.app/api/verify?token=${token}`) // เรียก backend
                 .then(response => {
                     setMessage(response.data.message);
                     if (response.data.status === 'OK') {

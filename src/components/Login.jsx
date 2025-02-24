@@ -17,7 +17,7 @@ function Login() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:3000/login', formData);
+            const response = await axios.post('https://donation-platform-sable.vercel.app/api/login', formData);
             if (response.data.status === 'OK') {
                 login(response.data.token); // ใช้ login จาก context
                 setMessage('ล็อกอินสำเร็จ! รอสักครู่...');
