@@ -1,4 +1,6 @@
 {
+  "name": "donation-project",
+  "version": "1.0.0",
   "scripts": {
       "dev": "vite",
       "build": "vite build",
@@ -10,7 +12,7 @@
       "body-parser": "^1.20.2",
       "bcrypt": "^5.1.1",
       "jsonwebtoken": "^9.0.2",
-      "mysql2": "^3.6.5",
+      "pg": "^8.11.3",
       "nodemailer": "^6.9.7",
       "react": "^18.2.0",
       "react-dom": "^18.2.0",
