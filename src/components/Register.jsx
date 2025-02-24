@@ -20,9 +20,12 @@ function Register() {
             console.log('Register response:', response.data);
             setMessage(response.data.message);
             if (response.data.status === 'OK') {
+                console.log('Registration successful, redirecting to pending-verification');
                 setTimeout(() => {
                     navigate('/pending-verification', { state: { email: formData.email } });
                 }, 1000);
+            } else {
+                console.warn('Unexpected response status:', response.data.status);
             }
         } catch (err) {
             const errorMessage = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการสมัคร';

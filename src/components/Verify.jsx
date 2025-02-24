@@ -12,19 +12,27 @@ function Verify() {
         const redirect = searchParams.get('redirect') || '/thank-you';
 
         if (token) {
-            axios.get(`https://donation-platform-sable.vercel.app/api/verify?token=${token}`) // เรียก backend
+            console.log('Verifying token:', token, 'Redirect to:', redirect); // Debug
+            axios.get(`https://donation-platform-sable.vercel.app/api/verify?token=${token}`)
                 .then(response => {
+                    console.log('Verify response:', response.data); // Debug
                     setMessage(response.data.message);
                     if (response.data.status === 'OK') {
+                        console.log('Verification successful, redirecting to:', redirect);
                         setTimeout(() => {
-                            navigate(redirect); // ไปตาม redirect
+                            navigate(redirect);
                         }, 2000);
+                    } else {
+                        console.warn('Unexpected verify status:', response.data.status);
                     }
                 })
                 .catch(err => {
-                    setMessage(err.response?.data.message || 'เกิดข้อผิดพลาด');
+                    const errorMessage = err.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยัน';
+                    console.error('Verify error:', err.response?.data || err); // Debug
+                    setMessage(errorMessage);
                 });
         } else {
+            console.error('No token provided in URL'); // Debug
             setMessage('ไม่มี token ในการยืนยัน');
         }
     }, [searchParams, navigate]);
@@ -34,6 +42,9 @@ function Verify() {
             <h2>{message.includes('สำเร็จ') ? 'ยินดีด้วย!' : 'เกิดข้อผิดพลาด'}</h2>
             <p>{message}</p>
             {message.includes('สำเร็จ') && <p>กำลังพาคุณไปหน้าที่กำหนด...</p>}
+            {message.includes('ข้อผิดพลาด') && (
+                <p>กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ</p>
+            )}
         </div>
     );
 }
