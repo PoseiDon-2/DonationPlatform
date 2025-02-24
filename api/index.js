@@ -24,7 +24,8 @@ const transporter = nodemailer.createTransport({
 
 async function initializeDatabase() {
     const dbUrl = process.env.DATABASE_URL;
-    console.log('DATABASE_URL:', dbUrl ? dbUrl.replace(/:([^@]+)@/, ':****@') : 'Not set');
+    console.log('Raw DATABASE_URL:', dbUrl); // Log ค่าเต็มเพื่อ debug
+    console.log('DATABASE_URL masked:', dbUrl ? dbUrl.replace(/:([^@]+)@/, ':****@') : 'Not set');
     if (!dbUrl) {
         throw new Error('DATABASE_URL environment variable is not set');
     }
@@ -54,11 +55,12 @@ app.use(async (req, res, next) => {
             dbPromise = initializeDatabase();
         } catch (err) {
             console.error('Failed to initialize database:', err);
-            return res.status(500).json({ status: 'error', message: 'Failed to initialize database' });
+            return res.status(500).json({ status: 'error', message: 'Failed to initialize database: ' + err.message });
         }
     }
     try {
         req.db = await dbPromise;
+        console.log('Database connection ready for request:', req.method, req.url);
         next();
     } catch (err) {
         console.error('Database error in middleware:', err);
@@ -66,6 +68,7 @@ app.use(async (req, res, next) => {
     }
 });
 
+// /register
 app.post('/register', async (req, res) => {
     const defaultProfilePicture = './image/large.jpg';
     try {
@@ -89,9 +92,9 @@ app.post('/register', async (req, res) => {
         console.log('Pending users:', pendingUsers);
 
         const hash = await bcrypt.hash(req.body.password, saltRounds);
-        console.log('Password hashed');
+        console.log('Password hashed successfully');
         const verificationToken = jwt.sign({ email: req.body.email }, secret, { expiresIn: '24h' });
-        console.log('Token generated:', verificationToken);
+        console.log('Verification token generated:', verificationToken);
 
         if (pendingUsers.length > 0) {
             await req.db.query(
@@ -117,7 +120,9 @@ app.post('/register', async (req, res) => {
 
         console.log('Sending email with:', {
             from: process.env.EMAIL_USER,
-            to: req.body.email
+            to: req.body.email,
+            userSet: !!process.env.EMAIL_USER,
+            passSet: !!process.env.EMAIL_PASS
         });
         await transporter.sendMail(mailOptions);
         console.log('Email sent successfully');
