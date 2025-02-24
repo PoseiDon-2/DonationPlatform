@@ -15,7 +15,7 @@ function Register() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:3000/register', formData);
+            const response = await axios.post('https://donation-platform-sable.vercel.app/api/register', formData);
             setMessage(response.data.message);
             setTimeout(() => {
                 navigate('/pending-verification', { state: { email: formData.email } });
