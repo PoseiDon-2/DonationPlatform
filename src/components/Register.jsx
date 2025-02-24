@@ -25,8 +25,9 @@ function Register() {
                 }, 1000);
             }
         } catch (err) {
-            console.error('Register error:', err.response?.data || err.message);
-            setMessage(err.response?.data.message || 'เกิดข้อผิดพลาดในการสมัคร');
+            const errorMessage = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการสมัคร';
+            console.error('Register error:', err.response?.data || err);
+            setMessage(errorMessage);
         }
     };
 
