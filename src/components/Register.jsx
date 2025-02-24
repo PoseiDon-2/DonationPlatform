@@ -15,13 +15,18 @@ function Register() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            console.log('Sending register request:', formData);
             const response = await axios.post('https://donation-platform-sable.vercel.app/api/register', formData);
+            console.log('Register response:', response.data);
             setMessage(response.data.message);
-            setTimeout(() => {
-                navigate('/pending-verification', { state: { email: formData.email } });
-            }, 1000);
+            if (response.data.status === 'OK') {
+                setTimeout(() => {
+                    navigate('/pending-verification', { state: { email: formData.email } });
+                }, 1000);
+            }
         } catch (err) {
-            setMessage(err.response?.data.message || 'เกิดข้อผิดพลาด');
+            console.error('Register error:', err.response?.data || err.message);
+            setMessage(err.response?.data.message || 'เกิดข้อผิดพลาดในการสมัคร');
         }
     };
 
