@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg'); // เปลี่ยนเป็น pg
+const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 
 const app = express();
@@ -23,29 +23,49 @@ const transporter = nodemailer.createTransport({
 });
 
 async function initializeDatabase() {
+    console.log('Initializing database with:', process.env.DATABASE_URL.replace(/:([^@]+)@/, ':****@')); // Log URL โดยซ่อน password
     const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
     });
+    // Test connection
+    await pool.query('SELECT NOW()').catch(err => {
+        console.error('Database connection failed:', err);
+        throw err;
+    });
+    console.log('Database connected successfully');
     return pool;
 }
 
 let dbPromise;
 
 app.use(async (req, res, next) => {
-    if (!dbPromise) dbPromise = initializeDatabase();
-    req.db = await dbPromise;
-    next();
+    if (!dbPromise) {
+        try {
+            dbPromise = initializeDatabase();
+        } catch (err) {
+            return next(err);
+        }
+    }
+    try {
+        req.db = await dbPromise;
+        next();
+    } catch (err) {
+        console.error('Database error in middleware:', err);
+        res.status(500).json({ status: 'error', message: 'Database connection failed' });
+    }
 });
 
-// /register
 app.post('/register', async (req, res) => {
     const defaultProfilePicture = './image/large.jpg';
     try {
+        console.log('Register request:', req.body);
+
         const [existingUsers] = (await req.db.query(
             'SELECT email FROM users WHERE email = $1',
             [req.body.email]
         )).rows;
+        console.log('Existing users:', existingUsers);
         if (existingUsers.length > 0) {
             return res.json({ status: 'error', message: 'Email is already registered' });
         }
@@ -54,19 +74,24 @@ app.post('/register', async (req, res) => {
             'SELECT email FROM pending_users WHERE email = $1',
             [req.body.email]
         )).rows;
+        console.log('Pending users:', pendingUsers);
+
         const hash = await bcrypt.hash(req.body.password, saltRounds);
         const verificationToken = jwt.sign({ email: req.body.email }, secret, { expiresIn: '24h' });
+        console.log('Generated token:', verificationToken);
 
         if (pendingUsers.length > 0) {
             await req.db.query(
                 'UPDATE pending_users SET name = $1, password_hash = $2, verification_token = $3 WHERE email = $4',
                 [req.body.name, hash, verificationToken, req.body.email]
             );
+            console.log('Updated pending_users');
         } else {
             await req.db.query(
                 'INSERT INTO pending_users (name, email, password_hash, verification_token) VALUES ($1, $2, $3, $4)',
                 [req.body.name, req.body.email, hash, verificationToken]
             );
+            console.log('Inserted into pending_users');
         }
 
         const verificationLink = `https://donation-platform-sable.vercel.app/verify?token=${verificationToken}&redirect=/thank-you`;
@@ -77,18 +102,17 @@ app.post('/register', async (req, res) => {
             html: `<p>คลิกที่นี่เพื่อยืนยันอีเมลของคุณ: <a href="${verificationLink}">ยืนยัน</a></p>`
         };
 
-        console.log('Attempting to send email with:', {
+        console.log('Sending email with:', {
             from: process.env.EMAIL_USER,
             to: req.body.email
         });
+        await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully');
 
-        await transporter.sendMail(mailOptions); // ไม่มี catch ที่นี่ จะไป catch รวม
-
-        console.log('Email sent successfully to:', req.body.email);
         res.json({ status: 'OK', message: 'Please check your email to verify and complete registration.' });
     } catch (err) {
         console.error('Register error:', err);
-        res.status(500).json({ status: 'error', message: `Failed to register: ${err.message}` });
+        res.status(500).json({ status: 'error', message: err.message });
     }
 });
 
