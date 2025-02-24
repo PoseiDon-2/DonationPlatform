@@ -28,9 +28,9 @@ async function initializeDatabase() {
     if (!dbUrl) {
         throw new Error('DATABASE_URL environment variable is not set');
     }
-    if (!dbUrl.includes('neon.tech')) {
-        console.error('DATABASE_URL does not point to Neon:', dbUrl);
-        throw new Error('Invalid DATABASE_URL: Must point to Neon');
+    if (!dbUrl.startsWith('postgresql://')) {
+        console.error('Invalid DATABASE_URL format:', dbUrl);
+        throw new Error('DATABASE_URL must start with "postgresql://"');
     }
     const pool = new Pool({
         connectionString: dbUrl,
@@ -45,6 +45,7 @@ async function initializeDatabase() {
     }
     return pool;
 }
+
 let dbPromise;
 
 app.use(async (req, res, next) => {
