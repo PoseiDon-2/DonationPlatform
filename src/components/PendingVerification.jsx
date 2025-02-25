@@ -21,7 +21,7 @@ function PendingVerification() {
         const interval = setInterval(async () => {
             try {
                 console.log('Polling for email:', email);
-                const response = await axios.get(`https://donation-platform-sable.vercel.app/api/check-verification?email=${email}`);
+                const response = await axios.get(`https://donation-platform-sable.vercel.app/check-verification?email=${email}`);
                 console.log('Check-verification response:', response.data);
 
                 if (response.data.status === 'verified') {

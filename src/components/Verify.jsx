@@ -13,7 +13,7 @@ function Verify() {
 
         if (token) {
             console.log('Verifying token:', token, 'Redirect to:', redirect); // Debug
-            axios.get(`https://donation-platform-sable.vercel.app/api/verify?token=${token}`)
+            axios.get(`https://donation-platform-sable.vercel.app/verify?token=${token}`)
                 .then(response => {
                     console.log('Verify response:', response.data); // Debug
                     setMessage(response.data.message);
