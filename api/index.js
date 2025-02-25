@@ -111,7 +111,7 @@ app.post('/register', async (req, res) => {
         }
 
         // ส่งอีเมลยืนยัน
-        const verificationLink = `https://donation-platform-sable.vercel.app/verify?token=${verificationToken}&redirect=/thank-you`;
+        const verificationLink = `https://donation-platform-sable.vercel.app/api/verify?token=${verificationToken}&redirect=/thank-you`;
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
@@ -281,5 +281,7 @@ app.get('/check-verification', async (req, res) => {
         res.json({ status: 'error', message: err.message });
     }
 });
+
+
 
 module.exports = app; // Export สำหรับ Vercel
