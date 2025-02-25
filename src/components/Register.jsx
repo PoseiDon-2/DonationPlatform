@@ -16,7 +16,7 @@ function Register() {
         e.preventDefault();
         try {
             console.log('Sending register request:', formData);
-            const response = await axios.post('https://donation-platform-sable.vercel.app/api/register', formData);
+            const response = await axios.post('https://donation-platform-sable.vercel.app/register', formData);
             console.log('Register response:', response.data);
             setMessage(response.data.message);
             if (response.data.status === 'OK') {
